@@ -194,37 +194,36 @@ int book_token(char* b_verse, char* token) {
 }
 
 int ch_token(char* b_verse, char* token) {
-    int len = strlen(token);
+    char col = ':';
+    char* pcol = strchr(token, col);
+    int len = strlen(pcol);
     // 토큰 길이가 0
     if(len <= 0) 
         return 0;
 
-    // 대소문자 구분 없애기
-    char low_token[len+1];
+    // ':' 삭제 후 chapter 추출
+    char ch_copy[len];
     for(int i=0; i<len; i++)
-        low_token[i] = tolower(token[i]);
-    low_token[len] = '\0';
+        ch_copy[i] = pcol[i+1];
+    ch_copy[len] = '\0';
 
-    // 주어진 문자열에서 각 단어와 비교
+    // chapter 형 변환(char -> int)
+    int ch_num = atoi(ch_copy);
+
+    // b_verse에서 chapter 추출
     char *word = strtok(b_verse, " ");
-    int word_len;
-    while(word != NULL) {
-        word_len = strlen(word);
-        char low_word[word_len+1];
-        for(int i=0; i<word_len; i++)
-            low_word[i] = tolower(word[i]);
-        low_word[word_len] = '\0';
+    word = strtok(NULL, " ");
+    char word_copy[len];
+    for(int i=0; i<len; i++)
+        word_copy[i] = word[i];
 
-        if(strcmp(low_token, low_word) == 0) {
-            if(word_len == len)
-                return 1; // 접두사와 일치하는 단어가 있으면 참 반환
-            else
-                return 0;
-        }
-        word = strtok(NULL, " ");
-    }
+    // word_copy 형 변환(char -> int)
+    int word_num = atoi(word_copy);
 
-    return 0; // 접두사와 일치하는 단어가 없으면 거짓 반환
+    if(ch_num == word_num)
+        return 1; 
+
+    return 0; // 일치하는 단어가 없으면 거짓 반환
 }
 
 int main (int argc, char ** argv)
