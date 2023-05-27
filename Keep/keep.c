@@ -45,6 +45,7 @@ void init() {
     }
 }
 
+// already track && update or delete
 int update(const char* path, int check) {
     FILE *fp_input, *fp_output;
     fp_input = fopen(".keep/tracking-files", "r"); // Open file for reading
@@ -97,6 +98,7 @@ int update(const char* path, int check) {
     return result;
 }
 
+// track
 void addFile(const char* path) {
     // 이미 동명의 파일의 add 되어 있는 경우
     if (update(path, 1)) {
@@ -127,6 +129,7 @@ void addFile(const char* path) {
     }
 }
 
+// untrack
 void removeFile(const char* path) {
     int result = update(path, 0);
     if(result) 
