@@ -129,17 +129,6 @@ int update(const char* path, int check) {
         fprintf(fp_output, "%s %ld\n", entry.path, entry.last_modified);
     }
 
-
-    // 수정!!!
-    if (stat(path, &st) == 0 && S_ISDIR(st.st_mode) && check == 1 && result == 0) {
-        // 디렉토리인 경우 하위 파일 및 디렉토리 순회하며 내용 추가
-        printf("여기에 혹시 들어오니??\n");
-        traverse_directory(path, fp_output);
-    }
-    ///
-
-
-
     if (rename(".keep/tracking-files.tmp", ".keep/tracking-files") != 0) {
         printf("Failed to update tracking-files.\n");
         exit(0);
@@ -154,7 +143,7 @@ int update(const char* path, int check) {
 
 // track
 void addFile(const char* path) {
-    // 이미 동명의 파일의 add 되어 있는 경우
+    // 이미 동명의 파일의 add 되어 있는 경우, 1 -> add
     if (update(path, 1)) {
         printf("File '%s' 수정\n", path);
         return;
@@ -175,16 +164,24 @@ void addFile(const char* path) {
                 printf("Failed to open tracking-files file for writing.\n");
                 return;
             }
-            printf("새로운 파일 '%s'이 추가되었습니다! \n", path);
-            fprintf(fp_output, "%s %ld\n", path, st.st_mtime); // Write path and last_mod values
-            fclose(fp_output);
-
+            // 새로 추가된 항목이 디렉토리
+            if (stat(path, &st) == 0 && S_ISDIR(st.st_mode)) {
+                // 디렉토리인 경우 하위 파일 및 디렉토리 순회하며 내용 추가
+                traverse_directory(path, fp_output);
+            // 새로 추가된 항목이 파일
+            } else {
+                // Write path and last_mod values   
+                fprintf(fp_output, "%s %ld\n", path, st.st_mtime);
+                fclose(fp_output);
+            }
+            printf("새로운 path '%s'이 추가되었습니다! \n", path);
         }
     }
 }
 
 // untrack
 void removeFile(const char* path) {
+    // 0 -> delete
     int result = update(path, 0);
     if(result) 
         printf("File '%s' Delete Success\n", path);
