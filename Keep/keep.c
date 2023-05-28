@@ -164,11 +164,11 @@ void addFile(const char* path) {
                 printf("Failed to open tracking-files file for writing.\n");
                 return;
             }
-            // 새로 추가된 항목이 디렉토리
+            // 새로 추가된 항목이 '디렉토리'
             if (stat(path, &st) == 0 && S_ISDIR(st.st_mode)) {
                 // 디렉토리인 경우 하위 파일 및 디렉토리 순회하며 내용 추가
                 traverse_directory(path, fp_output);
-            // 새로 추가된 항목이 파일
+            // 새로 추가된 항목이 '파일'
             } else {
                 // Write path and last_mod values   
                 fprintf(fp_output, "%s %ld\n", path, st.st_mtime);
@@ -215,109 +215,152 @@ void printVersions() {
     }
     closedir(dir);
 }
+// traking-files의 내용을 담아 줌
+void filled_files(TrackingFiles* files) {
+    FILE *fp_input;
+    fp_input = fopen(".keep/tracking-files", "r"); // Open file for reading
+    struct stat st;
+    int result = 0, find = 0;
 
-// void store(const char* note, TrackingFiles* files) {
-//     int updated = 0;
-//     for (int i = 0; i < files->count; i++) {
-//         struct stat st;
-//         if (stat(files->entries[i].path, &st) != 0) {
-//             printf("Failed to get file information for '%s'.\n", files->entries[i].path);
-//             continue;
-//         }
+    if (fp_input == NULL) {
+        printf("Failed to open files for reading or writing.\n");
+        exit(0);
+    }
 
-//         if (st.st_mtime > files->entries[i].last_modified) {
-//             updated = 1;
-//             break;
-//         }
-//     }
+    char line[MAX_PATH_LENGTH];
 
-//     if (!updated) {
-//         printf("Nothing to update.\n");
-//         return;
-//     }
+    // 초기화
+    files->count = 0;
 
-//     DIR* keep_dir = opendir(".keep");
-//     if (keep_dir == NULL) {
-//         printf("Failed to open '.keep' directory.\n");
-//         return;
-//     }
+    while (fgets(line, sizeof(line), fp_input)) {
+        Entry entry;
+        int num_fields = sscanf(line, "%s %ld", entry.path, &entry.last_modified);
+        
+        if (num_fields != 2) {
+            printf("Error parsing line: %s\n", line);
+            continue;
+        } else {
+            // 새로운 entry를 배열에 추가
+            files->count++;
+            files->entries[files->count - 1] = entry;
+        }
+    }
+    fclose(fp_input);
+}
 
-//     struct dirent* entry;
-//     int latest_version = 0;
-//     while ((entry = readdir(keep_dir)) != NULL) {
-//         if (entry->d_type == DT_DIR && strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
-//             int version = atoi(entry->d_name);
-//             if (version > latest_version) {
-//                 latest_version = version;
-//             }
-//         }
-//     }
-//     closedir(keep_dir);
+void store(char* note_name) {
+    // tracking-files에 있는 data로 담아 옴
+    TrackingFiles files;
+    int updated = 0;
+    filled_files(&files);
 
-//     char version_dir[MAX_PATH_LENGTH];
-//     snprintf(version_dir, sizeof(version_dir), ".keep/%d", latest_version + 1);
-//     if (mkdir(version_dir, 0700) != 0) {
-//         printf("Failed to create version directory.\n");
-//         return;
-//     }
+    printf("check count -> %d\n", files.count);
+    printf("check entries count -> %s\n", files.entries[0].path);
 
-//     char target_dir[MAX_PATH_LENGTH];
-//     snprintf(target_dir, sizeof(target_dir), "%s/target", version_dir);
-//     if (mkdir(target_dir, 0700) != 0) {
-//         printf("Failed to create target directory.\n");
-//         return;
-//     }
+    for (int i = 0; i < files.count; i++) {
+        struct stat st;
+        if (stat(files.entries[i].path, &st) != 0) {
+            printf("Failed to get information of '%s'.\n", files.entries[i].path);
+            continue;
+        }
 
-//     for (int i = 0; i < files->count; i++) {
-//         char target_path[MAX_PATH_LENGTH];
-//         snprintf(target_path, sizeof(target_path), "%s/%s", target_dir, files->entries[i].path);
+        if (st.st_mtime > files.entries[i].last_modified) {
+            updated = 1;
+            break;
+        }
+    }
 
-//         struct stat st;
-//         if (stat(files->entries[i].path, &st) != 0) {
-//             printf("Failed to get file information for '%s'.\n", files->entries[i].path);
-//             continue;
-//         }
+    if (!updated) {
+        printf("Nothing to update.\n");
+        return;
+    }
 
-//         if (st.st_mtime > files->entries[i].last_modified) {
-//             if (access(files->entries[i].path, F_OK) == 0) {
-//                 if (link(files->entries[i].path, target_path) != 0) {
-//                     printf("Failed to create a hard link for '%s'.\n", files->entries[i].path);
-//                     continue;
-//                 }
-//             } else {
-//                 printf("File '%s' does not exist.\n", files->entries[i].path);
-//                 continue;
-//             }
-//         } else {
-//             char latest_version_path[MAX_PATH_LENGTH];
-//             snprintf(latest_version_path, sizeof(latest_version_path), ".keep/%d/target/%s", latest_version, files->entries[i].path);
-//             if (link(latest_version_path, target_path) != 0) {
-//                 printf("Failed to create a hard link for '%s'.\n", files->entries[i].path);
-//                 continue;
-//             }
-//         }
-//     }
+    DIR* keep_loc = opendir(".keep");
+    if (keep_loc == NULL) {
+        printf("'.keep' directory is not exist\n");
+        return;
+    }
 
-//     FILE* note_file = fopen(".keep/latest-version", "w");
-//     if (note_file == NULL) {
-//         printf("Failed to open 'latest-version' file.\n");
-//         return;
-//     }
-//     fprintf(note_file, "%d", latest_version + 1);
-//     fclose(note_file);
+    // check latest version store file name
+    struct dirent* entry;
+    int latest_ver = 0;
+    while ((entry = readdir(keep_loc)) != NULL) {
+        if (entry->d_type == DT_DIR && strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
+            int ver = atoi(entry->d_name);
+            if (ver > latest_ver) {
+                latest_ver = ver;
+            }
+        }
+    }
+    closedir(keep_loc);
 
-//     char note_file_path[MAX_PATH_LENGTH];
-//     snprintf(note_file_path, sizeof(note_file_path), "%s/note", version_dir);
-//     FILE* note = fopen(note_file_path, "w");
-//     if (note == NULL) {
-//         printf("Failed to open 'note' file.\n");
-//         return;
-//     }
-//     fprintf(note, "%s", note);
-//     fclose(note);
+    // create version directory
+    char ver_d[MAX_PATH_LENGTH];
+    snprintf(ver_d, sizeof(ver_d), ".keep/%d", latest_ver + 1);
+    if (mkdir(ver_d, 0700) != 0) {
+        printf("Failed to create version directory.\n");
+        return;
+    }
 
-//     printf("Stored as version %d.\n", latest_version + 1);
-// }
+    // create target directory
+    char target_d[MAX_PATH_LENGTH];
+    snprintf(target_d, sizeof(target_d), "%s/target", ver_d);
+    if (mkdir(target_d, 0700) != 0) {
+        printf("Failed to create target directory.\n");
+        return;
+    }
+
+    for (int i = 0; i < files.count; i++) {
+        char target_path[MAX_PATH_LENGTH];
+        snprintf(target_path, sizeof(target_path), "%s/%s", target_d, files.entries[i].path);
+
+        struct stat st;
+        if (stat(files.entries[i].path, &st) != 0) {
+            printf("Failed to get file information for '%s'.\n", files.entries[i].path);
+            continue;
+        }
+
+        if (st.st_mtime > files.entries[i].last_modified) {
+            if (access(files.entries[i].path, F_OK) == 0) {
+                if (link(files.entries[i].path, target_path) != 0) {
+                    printf("Failed to create a hard link for '%s'.\n", files.entries[i].path);
+                    continue;
+                }
+            } else {
+                printf("File '%s' does not exist.\n", files.entries[i].path);
+                continue;
+            }
+        } else {
+            char latest_ver_path[MAX_PATH_LENGTH];
+            snprintf(latest_ver_path, sizeof(latest_ver_path), ".keep/%d/target/%s", latest_ver, files.entries[i].path);
+            if (link(latest_ver_path, target_path) != 0) {
+                printf("Failed to create a hard link for '%s'.\n", files.entries[i].path);
+                continue;
+            }
+        }
+    }
+
+    FILE* latest_info = fopen(".keep/latest-version", "w");
+    if (latest_info == NULL) {
+        printf("'latest-version' file is not exist\n");
+        return;
+    }
+    fprintf(latest_info, "%d", latest_ver + 1);
+    fclose(latest_info);
+
+    char note_path[MAX_PATH_LENGTH];
+    snprintf(note_path, sizeof(note_path), "%s/note", ver_d);
+
+    FILE* note = fopen(note_path, "w");
+    if (note == NULL) {
+        printf("'note' file is not exist\n");
+        return;
+    }
+    fprintf(note, "%s", note_name);
+    fclose(note);
+
+    printf("Stored as version %d.\n", latest_ver + 1);
+}
 
 // void restore(int version, TrackingFiles* files) {
 //     DIR* keep_dir = opendir(".keep");
@@ -425,10 +468,11 @@ int main(int argc, char ** argv) {
         // keep versions
         printVersions();
     } 
-    // else if (strcmp(command, "store") == 0) {
-    //     // keep store "note"
-    //     store(arg, &files);
-    // } else if (strcmp(command, "restore") == 0) {
+    else if (strcmp(command, "store") == 0) {
+        // keep store "note"
+        store(arg);
+    }
+    // else if (strcmp(command, "restore") == 0) {
     //     // keep restore <version>
     //     int version = atoi(arg);
     //     restore(version, &files);
