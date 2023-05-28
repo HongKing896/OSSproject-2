@@ -45,6 +45,47 @@ void init() {
     }
 }
 
+
+// 수정 함!!!
+void add_entry(FILE *fp, const char *path, long last_modified) {
+    fprintf(fp, "%s %ld\n", path, last_modified);
+}
+
+// 디렉토리를 track 할 경우 하위 폴더 및 파일까지 저장할 때 사용되는 함수
+void traverse_directory(const char *path, FILE *fp_output) {
+    DIR *dir = opendir(path);
+    if (dir == NULL) {
+        printf("Failed to open directory: %s\n", path);
+        return;
+    }
+    // dirent -> 디렉토리 엔트리를 나타내는 구조체
+    struct dirent *d_entry;
+    char file_path[MAX_PATH_LENGTH];
+    // readdir를 통해 하위 폴더 및 파일 존재할 때까지 반복
+    while ((d_entry = readdir(dir)) != NULL) {
+        if (strcmp(d_entry->d_name, ".") == 0 || strcmp(d_entry->d_name, "..") == 0) {
+            continue;
+        }
+
+        snprintf(file_path, sizeof(file_path), "%s/%s", path, d_entry->d_name);
+
+        struct stat st;
+        if (stat(file_path, &st) == 0) {
+            if (S_ISDIR(st.st_mode)) {
+                // 디렉토리일 경우 재귀적으로 탐색
+                traverse_directory(file_path, fp_output);
+            } else {
+                // 파일일 경우 추적 파일에 내용 추가
+                add_entry(fp_output, file_path, st.st_mtime);
+            }
+        }
+    }
+
+    closedir(dir);
+}
+// 수정 함!!!
+
+
 // already track && update or delete
 int update(const char* path, int check) {
     FILE *fp_input, *fp_output;
@@ -59,6 +100,7 @@ int update(const char* path, int check) {
     }
 
     char line[MAX_PATH_LENGTH];
+
     while (fgets(line, sizeof(line), fp_input)) {
         Entry entry;
         int num_fields = sscanf(line, "%s %ld", entry.path, &entry.last_modified);
@@ -68,10 +110,11 @@ int update(const char* path, int check) {
             continue;
         }
         
-        if (strcmp(entry.path, path) == 0) {
-            if (stat(path, &st) == 0) {
+        // track에서 보낸 path와 tracking-files 내부의 저장된 path 중 동일한 이름이 발견 됨
+        if (strstr(entry.path, path) != NULL) {
+            if (stat(entry.path, &st) == 0) {
                 printf("일치하는 파일명 중 수정할 것 찾았다!\n");
-                // Update the last_mod value
+                // Update the last_modified value
                 entry.last_modified = st.st_mtime;
                 result = 1, find = 1;
             }
@@ -85,6 +128,17 @@ int update(const char* path, int check) {
         // Write the entry to the temporary file
         fprintf(fp_output, "%s %ld\n", entry.path, entry.last_modified);
     }
+
+
+    // 수정!!!
+    if (stat(path, &st) == 0 && S_ISDIR(st.st_mode) && check == 1 && result == 0) {
+        // 디렉토리인 경우 하위 파일 및 디렉토리 순회하며 내용 추가
+        printf("여기에 혹시 들어오니??\n");
+        traverse_directory(path, fp_output);
+    }
+    ///
+
+
 
     if (rename(".keep/tracking-files.tmp", ".keep/tracking-files") != 0) {
         printf("Failed to update tracking-files.\n");
