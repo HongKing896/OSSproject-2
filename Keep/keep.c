@@ -257,243 +257,7 @@ void filled_files(TrackingFiles* files) {
 
 // ------ 수정 중 ---------
 
-// void add_file(FILE *fp_output, const char *file_path, const char *target_file) {
-//     fprintf(fp_output, "%s %s\n", file_path, target_file);
-// }
-
-// // 디렉토리를 track 할 경우 하위 폴더 및 파일까지 저장할 때 사용되는 함수
-// void directory_maker(const char *path, const char *target_dir) {
-//     DIR *dir = opendir(path);
-//     if (dir == NULL) {
-//         printf("Failed to open directory: %s\n", path);
-//         return;
-//     }
-
-//     // 추적 파일 열기
-//     FILE *fp_output = fopen(".keep/tracking-files", "a");
-//     if (fp_output == NULL) {
-//         printf("Failed to open tracking file.\n");
-//         closedir(dir);
-//         return;
-//     }
-
-//     // dirent -> 디렉토리 엔트리를 나타내는 구조체
-//     struct dirent *d_entry;
-//     char file_path[MAX_PATH_LENGTH];
-//     // readdir를 통해 하위 폴더 및 파일 존재할 때까지 반복
-//     while ((d_entry = readdir(dir)) != NULL) {
-//         if (strcmp(d_entry->d_name, ".") == 0 || strcmp(d_entry->d_name, "..") == 0) {
-//             continue;
-//         }
-
-//         snprintf(file_path, sizeof(file_path), "%s/%s", path, d_entry->d_name);
-
-//         struct stat st;
-//         if (stat(file_path, &st) == 0) {
-//             if (S_ISDIR(st.st_mode)) {
-//                 // 디렉토리일 경우 재귀적으로 탐색
-//                 char new_target_dir[MAX_PATH_LENGTH];
-//                 snprintf(new_target_dir, sizeof(new_target_dir), "%s/%s", target_dir, d_entry->d_name);
-//                 if (mkdir(new_target_dir, 0700) != 0) {
-//                     printf("Failed to create directory: %s\n", new_target_dir);
-//                     continue;
-//                 }
-//                 directory_maker(file_path, new_target_dir);
-//             } else {
-//                 // 파일일 경우 추적 파일에 내용 추가
-//                 char target_file[MAX_PATH_LENGTH];
-//                 snprintf(target_file, sizeof(target_file), "%s/%s/%s", target_dir, d_entry->d_name, d_entry->d_name);
-//                 add_file(fp_output, file_path, target_file);
-//             }
-//         }
-//     }
-
-//     // 추적 파일 닫기
-//     fclose(fp_output);
-//     closedir(dir);
-// }
-
-// // add_entry 함수는 추적 파일에 내용을 추가하는 함수로 이전에 작성된 함수를 활용하시면 됩니다.
-
-
-// void store(char* note_name) {
-//     TrackingFiles files;
-//     int updated = 0;
-//     // 원본 tracking-files에 있는 data를 files에 담아 옴
-//     filled_files(&files);
-
-//     printf("check count -> %d\n", files.count);
-//     printf("check entries count -> %s\n", files.entries[0].path);
-
-//     for (int i = 0; i < files.count; i++) {
-//         struct stat st;
-//         if (stat(files.entries[i].path, &st) != 0) {
-//             printf("Failed to get information of '%s'.\n", files.entries[i].path);
-//             continue;
-//         }
-
-//         if (st.st_mtime > files.entries[i].last_modified) {
-//             updated = 1;
-//             break;
-//         }
-//     }
-
-//     if (!updated) {
-//         printf("Nothing to update.\n");
-//         return;
-//     }
-
-//     DIR* keep_loc = opendir(".keep");
-//     if (keep_loc == NULL) {
-//         printf("'.keep' directory is not exist\n");
-//         return;
-//     }
-
-//     // check latest version store file name
-//     struct dirent* entry;
-//     int latest_ver = 0;
-//     while ((entry = readdir(keep_loc)) != NULL) {
-//         if (entry->d_type == DT_DIR && strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
-//             int ver = atoi(entry->d_name);
-//             if (ver > latest_ver) {
-//                 latest_ver = ver;
-//             }
-//         }
-//     }
-//     closedir(keep_loc);
-
-//     // create version directory
-//     char ver_d[MAX_PATH_LENGTH];
-//     snprintf(ver_d, sizeof(ver_d), ".keep/%d", latest_ver + 1);
-//     if (mkdir(ver_d, 0700) != 0) {
-//         printf("Failed to create version directory.\n");
-//         return;
-//     }
-//     // create tracking-files
-//     char tracking_d[MAX_PATH_LENGTH];
-//     snprintf(tracking_d, sizeof(tracking_d), "%s/tracking-files", ver_d);
-//     FILE* tracking_files = fopen(tracking_d, "w");
-//     if (tracking_files == NULL) {
-//         printf("Failed to create tracking-files.\n");
-//         return;
-//     }
-
-//     // create target directory
-//     char target_d[MAX_PATH_LENGTH];
-//     snprintf(target_d, sizeof(target_d), "%s/target", ver_d);
-//     if (mkdir(target_d, 0700) != 0) {
-//         printf("Failed to create target directory.\n");
-//         return;
-//     }
-
-
-//     for (int i = 0; i < files.count; i++) {
-//         char target_path[MAX_PATH_LENGTH];
-//         // snprintf(target_path, sizeof(target_path), "%s/%s", target_d, files.entries[i].path);
-
-//         struct stat st;
-//         if (stat(files.entries[i].path, &st) != 0) {
-//             printf("Failed to get file information for '%s'.\n", files.entries[i].path);
-//             continue;
-//         }
-
-//         if (st.st_mtime > files.entries[i].last_modified) {
-//             if (access(files.entries[i].path, F_OK) == 0) {
-//                  fprintf(tracking_files, "%s %ld\n", files.entries[i].path, st.st_mtime);
-//                  directory_maker(target_d, files.entries[i].path);
-//             } else {
-//                 printf("File '%s' does not exist.\n", files.entries[i].path);
-//                 continue;
-//             }
-//         } else {
-//             char latest_ver_path[MAX_PATH_LENGTH];
-//             snprintf(latest_ver_path, sizeof(latest_ver_path), ".keep/%d/target/%s", latest_ver, files.entries[i].path);
-//             if (mkdir(latest_ver_path, 0700) != 0) {
-//                     printf("Failed to create not change data directory.\n");
-//                     return;
-//             }
-//         }
-//     }
-
-//     fclose(tracking_files);
-
-
-//     // store된 tracking-files의 내용을 .keep/tracking-files에 update
-//     const char* readPath = tracking_d;
-//     int result = update(0, readPath, 2);
-//     printf("store에서 ressult -> %d\n", result);
-
-
-//     FILE* latest_info = fopen(".keep/latest-version", "w");
-//     if (latest_info == NULL) {
-//         printf("'latest-version' file is not exist.\n");
-//         return;
-//     }
-//     fprintf(latest_info, "%d", latest_ver + 1);
-//     fclose(latest_info);
-
-//     char note_path[MAX_PATH_LENGTH];
-//     snprintf(note_path, sizeof(note_path), "%s/note", ver_d);
-
-//     FILE* note = fopen(note_path, "w");
-//     if (note == NULL) {
-//         printf("'note' file is not exist.\n");
-//         return;
-//     }
-//     fprintf(note, "%s", note_name);
-//     fclose(note);
-
-//     printf("Stored as version %d.\n", latest_ver + 1);
-// }
-
-// -------- 수정 중 ---------
-
-
-
-
-void add_file(FILE* fp_output, const char* file_path, const char* target_file) {
-    fprintf(fp_output, "%s %s\n", file_path, target_file);
-}
-
-void directory_maker(const char* path, const char* target_dir, FILE* fp_output) {
-    DIR* dir = opendir(path);
-    if (dir == NULL) {
-        printf("Failed to open directory: %s\n", path);
-        return;
-    }
-
-    struct dirent* d_entry;
-    char file_path[MAX_PATH_LENGTH];
-
-    while ((d_entry = readdir(dir)) != NULL) {
-        if (strcmp(d_entry->d_name, ".") == 0 || strcmp(d_entry->d_name, "..") == 0) {
-            continue;
-        }
-
-        snprintf(file_path, sizeof(file_path), "%s/%s", path, d_entry->d_name);
-
-        struct stat st;
-        if (stat(file_path, &st) == 0) {
-            if (S_ISDIR(st.st_mode)) {
-                char new_target_dir[MAX_PATH_LENGTH];
-                snprintf(new_target_dir, sizeof(new_target_dir), "%s/%s", target_dir, d_entry->d_name);
-                if (mkdir(new_target_dir, 0700) != 0) {
-                    printf("Failed to create directory: %s\n", new_target_dir);
-                    continue;
-                }
-                directory_maker(file_path, new_target_dir, fp_output);
-            } else {
-                char target_file[MAX_PATH_LENGTH];
-                snprintf(target_file, sizeof(target_file), "%s/%s", target_dir, d_entry->d_name);
-                add_file(fp_output, file_path, target_file);
-            }
-        }
-    }
-
-    closedir(dir);
-}
-
-void store(const char* note_name) {
+void store(char* note_name) {
     TrackingFiles files;
     int updated = 0;
     // 원본 tracking-files에 있는 data를 files에 담아 옴
@@ -516,7 +280,7 @@ void store(const char* note_name) {
     }
 
     if (!updated) {
-        printf("Nothing to update.\n");
+        printf("Nothing to store.\n");
         return;
     }
 
@@ -539,13 +303,14 @@ void store(const char* note_name) {
     }
     closedir(keep_loc);
 
+    // create version directory
     char ver_d[MAX_PATH_LENGTH];
     snprintf(ver_d, sizeof(ver_d), ".keep/%d", latest_ver + 1);
     if (mkdir(ver_d, 0700) != 0) {
         printf("Failed to create version directory.\n");
         return;
     }
-
+    // create tracking-files
     char tracking_d[MAX_PATH_LENGTH];
     snprintf(tracking_d, sizeof(tracking_d), "%s/tracking-files", ver_d);
     FILE* tracking_files = fopen(tracking_d, "w");
@@ -554,6 +319,7 @@ void store(const char* note_name) {
         return;
     }
 
+    // create target directory
     char target_d[MAX_PATH_LENGTH];
     snprintf(target_d, sizeof(target_d), "%s/target", ver_d);
     if (mkdir(target_d, 0700) != 0) {
@@ -561,9 +327,10 @@ void store(const char* note_name) {
         return;
     }
 
+
     for (int i = 0; i < files.count; i++) {
         char target_path[MAX_PATH_LENGTH];
-        snprintf(target_path, sizeof(target_path), "%s/%s", target_d, files.entries[i].path);
+        // snprintf(target_path, sizeof(target_path), "%s/%s", target_d, files.entries[i].path);
 
         struct stat st;
         if (stat(files.entries[i].path, &st) != 0) {
@@ -573,26 +340,26 @@ void store(const char* note_name) {
 
         if (st.st_mtime > files.entries[i].last_modified) {
             if (access(files.entries[i].path, F_OK) == 0) {
-                fprintf(tracking_files, "%s %ld\n", files.entries[i].path, st.st_mtime);
-                directory_maker(files.entries[i].path, target_path, tracking_files);
+                 fprintf(tracking_files, "%s %ld\n", files.entries[i].path, st.st_mtime);
             } else {
                 printf("File '%s' does not exist.\n", files.entries[i].path);
                 continue;
             }
         } else {
+            fprintf(tracking_files, "%s %ld\n", files.entries[i].path, files.entries[i].last_modified);
             char latest_ver_path[MAX_PATH_LENGTH];
             snprintf(latest_ver_path, sizeof(latest_ver_path), ".keep/%d/target/%s", latest_ver, files.entries[i].path);
-            if (mkdir(latest_ver_path, 0700) != 0) {
-                printf("Failed to create not change data directory.\n");
-                return;
-            }
         }
     }
 
     fclose(tracking_files);
 
-    int result = update(0, tracking_d, 2);
+
+    // store된 tracking-files의 내용을 .keep/tracking-files에 update
+    const char* readPath = tracking_d;
+    int result = update(0, readPath, 2);
     printf("store에서 ressult -> %d\n", result);
+
 
     FILE* latest_info = fopen(".keep/latest-version", "w");
     if (latest_info == NULL) {
@@ -615,6 +382,9 @@ void store(const char* note_name) {
 
     printf("Stored as version %d.\n", latest_ver + 1);
 }
+
+// -------- 수정 중 ---------
+
 
 
 void restore(int version) {
@@ -654,7 +424,7 @@ void restore(int version) {
             continue;
         }
 
-        if (st.st_mtime > files.entries[i].last_modified) {
+        if (st.st_mtime <= files.entries[i].last_modified) {
             printf("File '%s' is alerady modified.\n", files.entries[i].path);
             return;
         }
